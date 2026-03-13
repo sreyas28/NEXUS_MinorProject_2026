@@ -10,9 +10,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Brain,
   Plug,
 } from 'lucide-react';
+import SutravaLogo from '../SutravaLogo';
 
 const navItems = [
   { id: 'upload', label: 'Upload Requirements', icon: Upload },
@@ -44,13 +44,10 @@ export default function Sidebar({ activePage, onNavigate }) {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 h-[64px] shrink-0 border-b border-white/5">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-             style={{ background: 'var(--gradient-primary)' }}>
-          <Brain size={20} className="text-white" />
-        </div>
+        <SutravaLogo size={36} className="shrink-0" />
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-base font-bold gradient-text whitespace-nowrap">ReqAI</h1>
+            <h1 className="text-base font-bold gradient-text whitespace-nowrap">Sutrava</h1>
             <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
               Requirements Engineering
             </p>

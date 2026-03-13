@@ -11,10 +11,10 @@ export default function Footer() {
               Tel: 123-456-789
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Email: hello@reqai.com
+              Email: hello@sutrava.com
             </p>
             <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Social: @reqai
+              Social: @sutrava
             </p>
           </div>
           <div>

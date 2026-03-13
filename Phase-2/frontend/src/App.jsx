@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import BenefitsSection from './components/BenefitsSection';
@@ -22,6 +23,7 @@ export default function App() {
   };
 
   return (
+    <AuthProvider>
     <div className="w-full min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <Navbar onNavigate={handleNavigate} activePage={activePage} />
 
@@ -128,5 +130,6 @@ export default function App() {
         )}
       </div>
     </div>
+    </AuthProvider>
   );
 }

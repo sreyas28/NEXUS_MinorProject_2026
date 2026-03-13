@@ -1,6 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plug, CheckCircle2, XCircle, Loader2, ExternalLink, RefreshCw, Send, FolderOpen, Plus } from 'lucide-react';
+import {
+  Plug,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  ExternalLink,
+  RefreshCw,
+  FolderOpen,
+  LogIn,
+  Globe,
+  ChevronDown,
+  Lock,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { getAtlassianResources, getAtlassianProjects } from '../services/api';
 
 function JiraIcon({ size = 20 }) {
   return (
@@ -24,69 +38,184 @@ function SlackIcon({ size = 20 }) {
 }
 
 export default function IntegrationsPage() {
-  const [jiraConfig, setJiraConfig] = useState({ url: '', email: '', token: '', project: '' });
-  const [jiraConnected, setJiraConnected] = useState(false);
-  const [jiraConnecting, setJiraConnecting] = useState(false);
-  const [slackConnected, setSlackConnected] = useState(false);
-  const [slackConnecting, setSlackConnecting] = useState(false);
-  const [slackChannel, setSlackChannel] = useState('');
+  const { isAuthenticated, login } = useAuth();
+
+  // Atlassian resources state
+  const [resources, setResources] = useState([]);
+  const [selectedResource, setSelectedResource] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [loadingResources, setLoadingResources] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [resourceError, setResourceError] = useState(null);
+
+  // Slack state (UI-only, no backend support yet)
+  const [slackConnected] = useState(false);
   const [notifications, setNotifications] = useState({ onUpload: true, onClassify: true, onPrioritize: false, onExport: true });
 
-  const handleJiraConnect = async () => { setJiraConnecting(true); await new Promise(r => setTimeout(r, 1500)); setJiraConnected(true); setJiraConnecting(false); };
-  const handleSlackConnect = async () => { setSlackConnecting(true); await new Promise(r => setTimeout(r, 1200)); setSlackConnected(true); setSlackConnecting(false); };
+  // Fetch Atlassian resources when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchResources();
+  }, [isAuthenticated]);
+
+  const fetchResources = async () => {
+    setLoadingResources(true);
+    setResourceError(null);
+    try {
+      const data = await getAtlassianResources();
+      if (data) {
+        setResources(data);
+        if (data.length > 0) {
+          setSelectedResource(data[0]);
+          fetchProjects(data[0].id);
+        }
+      }
+    } catch (err) {
+      setResourceError('Failed to load Atlassian resources');
+      console.error(err);
+    } finally {
+      setLoadingResources(false);
+    }
+  };
+
+  const fetchProjects = async (cloudId) => {
+    setLoadingProjects(true);
+    try {
+      const data = await getAtlassianProjects(cloudId);
+      if (data) setProjects(data);
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const handleResourceChange = (e) => {
+    const resource = resources.find(r => r.id === e.target.value);
+    setSelectedResource(resource);
+    if (resource) fetchProjects(resource.id);
+  };
 
   return (
     <div className="space-y-6 max-w-5xl">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="heading-lg">Integrations</h1>
-        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Connect with JIRA and Slack to streamline your workflow</p>
+        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Connect with Atlassian JIRA and Slack to streamline your workflow</p>
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* JIRA */}
+        {/* JIRA / Atlassian */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="card space-y-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#eff6ff' }}><JiraIcon size={22} /></div>
             <div className="flex-1">
-              <h3 className="text-base font-bold">JIRA</h3>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Project management & issue tracking</p>
+              <h3 className="text-base font-bold">Atlassian JIRA</h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Project management & issue tracking via OAuth</p>
             </div>
-            {jiraConnected ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle2 size={14} /> Connected</span> : <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}><XCircle size={14} /> Not connected</span>}
+            {isAuthenticated ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle2 size={14} /> Connected</span> : <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}><XCircle size={14} /> Not connected</span>}
           </div>
 
-          {!jiraConnected ? (
-            <div className="space-y-3">
-              <input className="input-field" placeholder="JIRA URL" value={jiraConfig.url} onChange={(e) => setJiraConfig({ ...jiraConfig, url: e.target.value })} />
-              <input className="input-field" placeholder="Email address" value={jiraConfig.email} onChange={(e) => setJiraConfig({ ...jiraConfig, email: e.target.value })} />
-              <input className="input-field" type="password" placeholder="API Token" value={jiraConfig.token} onChange={(e) => setJiraConfig({ ...jiraConfig, token: e.target.value })} />
-              <button onClick={handleJiraConnect} disabled={jiraConnecting} className="btn-dark w-full flex items-center justify-center gap-2">
-                {jiraConnecting ? <><Loader2 size={16} className="animate-spin" /> Connecting…</> : <><Plug size={16} /> Connect to JIRA</>}
+          {!isAuthenticated ? (
+            <div className="text-center py-6">
+              <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: '#eff6ff' }}><JiraIcon size={28} /></div>
+              <p className="text-sm font-semibold mb-1">Connect with Atlassian</p>
+              <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Sign in with your Atlassian account to access JIRA projects</p>
+              <button onClick={login} className="btn-dark inline-flex items-center gap-2">
+                <LogIn size={16} /> Login with Atlassian
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-secondary)' }}>Project</label>
-                <select className="input-field" value={jiraConfig.project} onChange={(e) => setJiraConfig({ ...jiraConfig, project: e.target.value })}>
-                  <option value="">Select project…</option>
-                  <option value="REQ">REQ — Requirements Engineering</option>
-                  <option value="AI">AI — AI Platform</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
-                <RefreshCw size={16} className="text-emerald-500" />
-                <div className="flex-1"><p className="text-xs font-semibold">Last synced 3 min ago</p><p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>12 issues synced</p></div>
-                <button className="btn-ghost text-xs flex items-center gap-1"><RefreshCw size={12} /> Sync Now</button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button className="btn-dark flex items-center justify-center gap-2 text-xs"><Plus size={14} /> Create Issues</button>
-                <button className="btn-outlined flex items-center justify-center gap-2 text-xs"><FolderOpen size={14} /> View Board <ExternalLink size={12} /></button>
-              </div>
+              {/* Resource selector */}
+              {loadingResources ? (
+                <div className="flex items-center justify-center py-4 gap-2">
+                  <Loader2 size={16} className="animate-spin text-blue-500" />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading Atlassian sites…</span>
+                </div>
+              ) : resourceError ? (
+                <div className="p-3 rounded-xl text-center" style={{ background: 'var(--bg-secondary)' }}>
+                  <p className="text-xs text-red-500 mb-2">{resourceError}</p>
+                  <button onClick={fetchResources} className="btn-ghost text-xs flex items-center gap-1 mx-auto">
+                    <RefreshCw size={12} /> Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {resources.length > 0 && (
+                    <div>
+                      <label className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        <Globe size={12} className="inline mr-1" />Atlassian Site
+                      </label>
+                      <div className="relative">
+                        <select
+                          className="input-field !pr-8 appearance-none cursor-pointer"
+                          value={selectedResource?.id || ''}
+                          onChange={handleResourceChange}
+                        >
+                          {resources.map((r) => (
+                            <option key={r.id} value={r.id}>{r.name} — {r.url}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Projects list */}
+                  <div>
+                    <label className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      <FolderOpen size={12} className="inline mr-1" />Projects
+                    </label>
+                    {loadingProjects ? (
+                      <div className="flex items-center justify-center py-4 gap-2">
+                        <Loader2 size={14} className="animate-spin text-blue-500" />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading projects…</span>
+                      </div>
+                    ) : projects.length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {projects.map((proj) => (
+                          <div key={proj.id} className="flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-gray-50" style={{ background: 'var(--bg-secondary)' }}>
+                            {proj.avatarUrls && (
+                              <img
+                                src={proj.avatarUrls['48x48'] || proj.avatarUrls['32x32'] || Object.values(proj.avatarUrls)[0]}
+                                alt={proj.name}
+                                className="w-8 h-8 rounded-lg"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold truncate">{proj.name}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: '#eff6ff', color: '#2684FF' }}>{proj.key}</span>
+                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{proj.projectTypeKey}</span>
+                                {proj.isPrivate && <Lock size={10} style={{ color: 'var(--text-muted)' }} />}
+                              </div>
+                            </div>
+                            <a
+                              href={selectedResource ? `${selectedResource.url}/jira/software/projects/${proj.key}/board` : '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-ghost !p-1.5"
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs py-3 text-center" style={{ color: 'var(--text-muted)' }}>No projects found for this site</p>
+                    )}
+                  </div>
+
+                  <button onClick={fetchResources} className="btn-ghost w-full flex items-center justify-center gap-2 text-xs">
+                    <RefreshCw size={14} /> Refresh Data
+                  </button>
+                </>
+              )}
             </div>
           )}
         </motion.div>
 
-        {/* Slack */}
+        {/* Slack — Coming Soon */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card space-y-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#f0fdf4' }}><SlackIcon size={22} /></div>
@@ -94,47 +223,31 @@ export default function IntegrationsPage() {
               <h3 className="text-base font-bold">Slack</h3>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Notifications & team communication</p>
             </div>
-            {slackConnected ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-500"><CheckCircle2 size={14} /> Connected</span> : <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}><XCircle size={14} /> Not connected</span>}
+            <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: '#fef3c7', color: '#d97706' }}>COMING SOON</span>
           </div>
 
-          {!slackConnected ? (
-            <div className="text-center py-6">
-              <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: '#f0fdf4' }}><SlackIcon size={28} /></div>
-              <p className="text-sm font-semibold mb-1">Connect your workspace</p>
-              <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Authorize ReqAI to send notifications</p>
-              <button onClick={handleSlackConnect} disabled={slackConnecting} className="btn-dark inline-flex items-center gap-2">
-                {slackConnecting ? <><Loader2 size={16} className="animate-spin" /> Connecting…</> : <><Plug size={16} /> Add to Slack</>}
-              </button>
+          <div className="text-center py-6 opacity-60">
+            <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3" style={{ background: '#f0fdf4' }}><SlackIcon size={28} /></div>
+            <p className="text-sm font-semibold mb-1">Slack integration</p>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Slack notifications will be available once the backend integration is implemented</p>
+          </div>
+
+          {/* Notification preferences — kept for future use */}
+          <div className="opacity-50 pointer-events-none">
+            <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>Notification Events (preview)</label>
+            <div className="space-y-2">
+              {[{ key: 'onUpload', label: 'Document uploaded' }, { key: 'onClassify', label: 'Classification completed' }, { key: 'onPrioritize', label: 'Prioritization finished' }, { key: 'onExport', label: 'Report exported' }].map((item) => (
+                <label key={item.key} className="flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors" style={{ background: 'var(--bg-secondary)' }}>
+                  <span className="text-xs font-medium">{item.label}</span>
+                  <div className="relative">
+                    <input type="checkbox" checked={notifications[item.key]} onChange={() => setNotifications(n => ({ ...n, [item.key]: !n[item.key] }))} className="sr-only peer" />
+                    <div className="w-9 h-5 rounded-full transition-colors peer-checked:bg-black bg-gray-300" />
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
+                  </div>
+                </label>
+              ))}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-secondary)' }}>Notification Channel</label>
-                <select className="input-field" value={slackChannel} onChange={(e) => setSlackChannel(e.target.value)}>
-                  <option value="">Select channel…</option>
-                  <option value="general"># general</option>
-                  <option value="requirements"># requirements</option>
-                  <option value="dev-updates"># dev-updates</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-secondary)' }}>Events</label>
-                <div className="space-y-2">
-                  {[{ key: 'onUpload', label: 'Document uploaded' }, { key: 'onClassify', label: 'Classification completed' }, { key: 'onPrioritize', label: 'Prioritization finished' }, { key: 'onExport', label: 'Report exported' }].map((item) => (
-                    <label key={item.key} className="flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors hover:bg-gray-50" style={{ background: 'var(--bg-secondary)' }}>
-                      <span className="text-xs font-medium">{item.label}</span>
-                      <div className="relative">
-                        <input type="checkbox" checked={notifications[item.key]} onChange={() => setNotifications(n => ({ ...n, [item.key]: !n[item.key] }))} className="sr-only peer" />
-                        <div className="w-9 h-5 rounded-full transition-colors peer-checked:bg-black bg-gray-300" />
-                        <div className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform peer-checked:translate-x-4" />
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <button className="btn-outlined w-full flex items-center justify-center gap-2 text-xs"><Send size={14} /> Send Test Message</button>
-            </div>
-          )}
+          </div>
         </motion.div>
       </div>
     </div>

@@ -1,14 +1,51 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Palette, Server, Info, Save, RotateCcw, Type, Monitor, Globe, Brain } from 'lucide-react';
+import {
+  Palette,
+  Server,
+  Info,
+  Save,
+  RotateCcw,
+  Type,
+  Monitor,
+  Globe,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Zap,
+} from 'lucide-react';
+import SutravaLogo from '../components/SutravaLogo';
+import { getApiBase, testBackendConnection } from '../services/api';
 
 export default function SettingsPage() {
-  const [apiEndpoint, setApiEndpoint] = useState('http://localhost:8000/api');
+  const [apiEndpoint, setApiEndpoint] = useState(getApiBase());
   const [fontSize, setFontSize] = useState('14');
   const [language, setLanguage] = useState('en');
   const [saved, setSaved] = useState(false);
 
+  // Connection test state
+  const [connectionStatus, setConnectionStatus] = useState('idle'); // idle | testing | success | error
+  const [connectionMessage, setConnectionMessage] = useState('');
+
   const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  const handleTestConnection = async () => {
+    setConnectionStatus('testing');
+    setConnectionMessage('');
+    try {
+      const result = await testBackendConnection();
+      if (result && result.body) {
+        setConnectionStatus('success');
+        setConnectionMessage(`Backend responded: ${result.body}`);
+      } else {
+        setConnectionStatus('error');
+        setConnectionMessage('Backend returned empty response');
+      }
+    } catch (err) {
+      setConnectionStatus('error');
+      setConnectionMessage(`Connection failed: ${err.message}`);
+    }
+  };
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -65,16 +102,38 @@ export default function SettingsPage() {
         </div>
         <div>
           <label className="text-xs font-semibold block mb-1.5" style={{ color: 'var(--text-secondary)' }}>Backend Endpoint</label>
-          <input className="input-field font-mono text-xs" value={apiEndpoint} onChange={(e) => setApiEndpoint(e.target.value)} placeholder="http://localhost:8000/api" />
+          <input className="input-field font-mono text-xs" value={apiEndpoint} onChange={(e) => setApiEndpoint(e.target.value)} placeholder="http://localhost:8080" />
         </div>
+
+        {/* Connection status */}
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
-          <Monitor size={16} className="text-emerald-500" />
+          {connectionStatus === 'testing' && <Loader2 size={16} className="text-blue-500 animate-spin" />}
+          {connectionStatus === 'success' && <CheckCircle2 size={16} className="text-emerald-500" />}
+          {connectionStatus === 'error' && <XCircle size={16} className="text-red-500" />}
+          {connectionStatus === 'idle' && <Monitor size={16} className="text-gray-400" />}
           <div className="flex-1">
-            <p className="text-xs font-semibold">Connection Status</p>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Backend API is reachable</p>
+            <p className="text-xs font-semibold">
+              {connectionStatus === 'testing' && 'Testing connection…'}
+              {connectionStatus === 'success' && 'Connection successful'}
+              {connectionStatus === 'error' && 'Connection failed'}
+              {connectionStatus === 'idle' && 'Connection Status'}
+            </p>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              {connectionMessage || (connectionStatus === 'idle' ? 'Click "Test Connection" to verify backend availability' : '')}
+            </p>
           </div>
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+          {connectionStatus === 'success' && <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />}
+          {connectionStatus === 'error' && <div className="w-2 h-2 bg-red-500 rounded-full" />}
         </div>
+
+        <button
+          onClick={handleTestConnection}
+          disabled={connectionStatus === 'testing'}
+          className="btn-outlined w-full flex items-center justify-center gap-2 text-xs disabled:opacity-50"
+        >
+          <Zap size={14} />
+          {connectionStatus === 'testing' ? 'Testing…' : 'Test Connection'}
+        </button>
       </motion.div>
 
       {/* About */}
@@ -85,12 +144,12 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: 'var(--bg-secondary)' }}>
           <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #c8b4ff, #f5c8d8)' }}>
-            <Brain size={24} className="text-white" />
+            <SutravaLogo size={28} />
           </div>
           <div>
-            <h3 className="text-base font-bold">ReqAI</h3>
+            <h3 className="text-base font-bold">Sutrava</h3>
             <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>AI-Driven Automated Requirements Engineering System</p>
-            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>Version 1.0.0 • Built with React + Vite</p>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>Version 1.0.0 • Built with React + Vite • Backend: Spring Boot 4</p>
           </div>
         </div>
       </motion.div>
